@@ -23,4 +23,5 @@ export {
   usePerformanceMonitor, 
   useAsyncPerformanceTracker 
 } from './usePerformanceMonitor';
+export { useZoom } from './useZoom';
 export { TAB_SCREEN_NAMES } from './useAnalytics';

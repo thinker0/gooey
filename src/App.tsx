@@ -23,7 +23,8 @@ import { ProjectSettings } from '@/components/ProjectSettings';
 import { TabManager } from "@/components/TabManager";
 import { TabContent } from "@/components/TabContent";
 import { useTabState } from "@/hooks/useTabState";
-import { useAppLifecycle, useTrackEvent } from "@/hooks";
+import { AnalyticsConsentBanner } from "@/components/AnalyticsConsent";
+import { useAppLifecycle, useTrackEvent, useZoom } from "@/hooks";
 import { StartupIntro } from "@/components/StartupIntro";
 
 type View = 
@@ -48,6 +49,7 @@ type View =
 function AppContent() {
   const [view, setView] = useState<View>("tabs");
   const { createClaudeMdTab, createSettingsTab, createUsageTab, createMCPTab, createAgentsTab } = useTabState();
+  const { zoomIn, zoomOut, resetZoom } = useZoom();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -92,47 +94,65 @@ function AppContent() {
     }
   }, [view]);
 
-  // Keyboard shortcuts for tab navigation
+  // Keyboard shortcuts for tab navigation and zoom
   useEffect(() => {
-    if (view !== "tabs") return;
-    
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
       
       if (modKey) {
         switch (e.key) {
-          case 't':
+          case '+':
+          case '=': // Handle both + and = keys (= is unshifted + on many keyboards)
             e.preventDefault();
-            window.dispatchEvent(new CustomEvent('create-chat-tab'));
+            zoomIn();
             break;
-          case 'w':
+          case '-':
+          case '_':
             e.preventDefault();
-            window.dispatchEvent(new CustomEvent('close-current-tab'));
+            zoomOut();
             break;
-          case 'Tab':
+          case '0':
             e.preventDefault();
-            if (e.shiftKey) {
-              window.dispatchEvent(new CustomEvent('switch-to-previous-tab'));
-            } else {
-              window.dispatchEvent(new CustomEvent('switch-to-next-tab'));
-            }
+            resetZoom();
             break;
-          default:
-            // Handle number keys 1-9
-            if (e.key >= '1' && e.key <= '9') {
+        }
+        
+        // Only handle tab navigation when in tabs view
+        if (view === "tabs") {
+          switch (e.key) {
+            case 't':
               e.preventDefault();
-              const index = parseInt(e.key) - 1;
-              window.dispatchEvent(new CustomEvent('switch-to-tab-by-index', { detail: { index } }));
-            }
-            break;
+              window.dispatchEvent(new CustomEvent('create-chat-tab'));
+              break;
+            case 'w':
+              e.preventDefault();
+              window.dispatchEvent(new CustomEvent('close-current-tab'));
+              break;
+            case 'Tab':
+              e.preventDefault();
+              if (e.shiftKey) {
+                window.dispatchEvent(new CustomEvent('switch-to-previous-tab'));
+              } else {
+                window.dispatchEvent(new CustomEvent('switch-to-next-tab'));
+              }
+              break;
+            default:
+              // Handle number keys 1-9
+              if (e.key >= '1' && e.key <= '9') {
+                e.preventDefault();
+                const index = parseInt(e.key) - 1;
+                window.dispatchEvent(new CustomEvent('switch-to-tab-by-index', { detail: { index } }));
+              }
+              break;
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view]);
+  }, [view, zoomIn, zoomOut, resetZoom]);
 
   // Listen for Claude not found events
   useEffect(() => {
