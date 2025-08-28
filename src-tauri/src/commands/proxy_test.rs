@@ -334,3 +334,110 @@ fn test_complex_auth_urls() {
     assert_eq!(result, "http://new:creds@example.com/");
     assert!(!result.contains("existing:auth"));
 }
+
+#[test]
+fn test_no_proxy_localhost_handling() {
+    // Setup - clear any existing proxy env vars
+    env::remove_var("NO_PROXY");
+
+    // Test with user-defined no_proxy that includes some default values
+    let settings = ProxySettings {
+        http_proxy: Some("http://example.com:8080".to_string()),
+        https_proxy: Some("http://example.com:8080".to_string()),
+        no_proxy: Some("localhost,.example.com,192.168.1.1".to_string()),
+        all_proxy: None,
+        proxy_username: None,
+        proxy_password: None,
+        enabled: true,
+    };
+
+    apply_proxy_settings(&settings);
+
+    let no_proxy = env::var("NO_PROXY").unwrap();
+    
+    // Should contain all default localhost entries
+    assert!(no_proxy.contains("localhost"));
+    assert!(no_proxy.contains("127.0.0.1"));
+    assert!(no_proxy.contains("::1"));
+    assert!(no_proxy.contains("0.0.0.0"));
+    
+    // Should contain user-defined entries
+    assert!(no_proxy.contains(".example.com"));
+    assert!(no_proxy.contains("192.168.1.1"));
+    
+    // Should not duplicate localhost
+    let localhost_count = no_proxy.matches("localhost").count();
+    assert_eq!(localhost_count, 1, "localhost should appear only once in NO_PROXY");
+
+    // Cleanup
+    env::remove_var("NO_PROXY");
+}
+
+#[test]
+fn test_no_proxy_empty_handling() {
+    // Setup - clear any existing proxy env vars
+    env::remove_var("NO_PROXY");
+
+    // Test with empty no_proxy
+    let settings = ProxySettings {
+        http_proxy: Some("http://example.com:8080".to_string()),
+        https_proxy: Some("http://example.com:8080".to_string()),
+        no_proxy: Some("".to_string()),
+        all_proxy: None,
+        proxy_username: None,
+        proxy_password: None,
+        enabled: true,
+    };
+
+    apply_proxy_settings(&settings);
+
+    let no_proxy = env::var("NO_PROXY").unwrap();
+    
+    // Should only contain default localhost entries
+    assert!(no_proxy.contains("localhost"));
+    assert!(no_proxy.contains("127.0.0.1"));
+    assert!(no_proxy.contains("::1"));
+    assert!(no_proxy.contains("0.0.0.0"));
+    
+    // Should not contain any empty entries
+    assert!(!no_proxy.contains(",,"));
+
+    // Cleanup
+    env::remove_var("NO_PROXY");
+}
+
+#[test]
+fn test_no_proxy_whitespace_handling() {
+    // Setup - clear any existing proxy env vars
+    env::remove_var("NO_PROXY");
+
+    // Test with no_proxy containing whitespace and empty entries
+    let settings = ProxySettings {
+        http_proxy: Some("http://example.com:8080".to_string()),
+        https_proxy: Some("http://example.com:8080".to_string()),
+        no_proxy: Some("  localhost  , .example.com , , 192.168.1.1  ".to_string()),
+        all_proxy: None,
+        proxy_username: None,
+        proxy_password: None,
+        enabled: true,
+    };
+
+    apply_proxy_settings(&settings);
+
+    let no_proxy = env::var("NO_PROXY").unwrap();
+    
+    // Should contain trimmed entries
+    assert!(no_proxy.contains(".example.com"));
+    assert!(no_proxy.contains("192.168.1.1"));
+    
+    // Should not duplicate localhost
+    let localhost_count = no_proxy.matches("localhost").count();
+    assert_eq!(localhost_count, 1, "localhost should appear only once in NO_PROXY");
+    
+    // Should not contain empty entries or extra whitespace
+    assert!(!no_proxy.contains(",,"));
+    assert!(!no_proxy.contains("  "));
+
+    // Cleanup
+    env::remove_var("NO_PROXY");
+}

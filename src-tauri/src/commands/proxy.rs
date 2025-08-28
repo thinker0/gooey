@@ -147,7 +147,19 @@ pub fn apply_proxy_settings(settings: &ProxySettings) {
     let mut no_proxy_list = vec!["localhost", "127.0.0.1", "::1", "0.0.0.0"];
     if let Some(user_no_proxy) = &settings.no_proxy {
         if !user_no_proxy.is_empty() {
-            no_proxy_list.push(user_no_proxy.as_str());
+            // Split user input by commas and add each item separately
+            let user_entries: Vec<&str> = user_no_proxy
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+            
+            for entry in user_entries {
+                // Only add if it's not already in the default list
+                if !no_proxy_list.contains(&entry) {
+                    no_proxy_list.push(entry);
+                }
+            }
         }
     }
     let no_proxy_value = no_proxy_list.join(",");
